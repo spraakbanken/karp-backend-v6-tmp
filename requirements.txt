@@ -17,6 +17,7 @@ json_streams
 paradigmextract>=0.1.0
 pydantic
 pyjwt
+regex
 sb-json-tools>=0.5.2
 sqlalchemy
 sqlalchemy-json

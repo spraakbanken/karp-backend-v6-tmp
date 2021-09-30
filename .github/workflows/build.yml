@@ -1,0 +1,128 @@
+name: Build
+
+on: [push]
+
+jobs:
+  checks:
+    name: ${{ matrix.task.name }} py-${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      max-parallel: 4
+      fail-fast: false
+      matrix:
+        python-version: [3.8]
+        os: [ubuntu-latest]
+        task:
+          - name: Lint w pylint
+            run: make lint
+            allow_failure: true
+          # - name: Lint w bandit
+          #   run: make lint-security-issues
+          #   allow_failure: false
+          - name: Unit tests
+            run: make unit-tests
+            allow_failure: false
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: make install-dev
+
+      - name: ${{ matrix.task.name }}
+        run: ${{ matrix.task.run }}
+        continue-on-error: ${{ matrix.task.allow_failure }}
+        env:
+          DB_DRIVER: sqlite
+
+  tests:
+    name: ${{ matrix.task.name }} py-${{ matrix.python-version }} es-${{ matrix.es.version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    services:
+      mysql:
+        image: mariadb:10.3
+        ports:
+          - 3306
+        env:
+          MYSQL_ROOT_PASSWORD: testing
+          MYSQL_DATABASE: karp
+          MYSQL_PASSWORD: testing
+          MYSQL_USER: karp
+        options: >-
+          --health-cmd "mysqladmin ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    strategy:
+      max-parallel: 4
+      fail-fast: false
+      matrix:
+        python-version: [3.8]
+        es:
+          - use: false
+            version: NO
+          - use: true
+            version: 6.8.18
+        os: [ubuntu-latest]
+        task:
+          - name: Integration tests
+            run: make integration-tests
+          - name: End-to-end tests
+            run: make e2e-tests
+        exclude:
+          - es:
+              use: false
+            task:
+              name: End-to-end tests
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          make install-dev
+          make install-mysql
+
+      - name: Install Elasticsearch 6
+        if: startsWith( matrix.es.version, '6')
+        run: |
+          wget https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-${{ matrix.es.version }}.tar.gz
+          tar -xzf elasticsearch-${{ matrix.es.version }}.tar.gz
+          echo "TEST_ELASTICSEARCH_ENABLED=True" >> .env
+          echo "TEST_ES_HOME=`realpath elasticsearch-${{ matrix.es.version }}`" >> .env
+          echo "SEARCH_CONTEXT=es6_search_service" >> .env
+          cat .env
+          # pip install -e .[elasticsearch6]
+
+      - name: Install Elasticsearch 7
+        if: startsWith( matrix.es.version, '7')
+        run: |
+          wget https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-${{ matrix.es.version }}-linux-x86_64.tar.gz
+          tar -xzf elasticsearch-${{ matrix.es.version }}-linux-x86_64.tar.gz
+          echo "TEST_ELASTICSEARCH_ENABLED=True" >> .env
+          echo "TEST_ES_HOME=`realpath elasticsearch-${{ matrix.es.version }}`" >> .env
+          cat .env
+          pip install -e .[elasticsearch7]
+          #- name: Setup sql index
+          #if: ! ${{ matrix.es.use }}
+          #run: echo "SEARCH_CONTEXT=sql_index" >> .env
+      - name: ${{ matrix.task.name }}
+        run: ${{ matrix.task.run }}
+        env:
+          DB_TEST_DATABASE: karp
+          DB_USER: karp
+          DB_PASSWORD: testing
+          DB_HOST: 127.0.0.1
+          DB_PORT: ${{ job.services.mysql.ports['3306'] }}

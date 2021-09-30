@@ -1,0 +1,115 @@
+{
+  "resource_id": "municipalities",
+  "resource_name": "Kommuner i Sverige",
+  "fields": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "state": {
+      "type": "string"
+    },
+    "region": {
+      "type": "string"
+    },
+    "capital": {
+      "type": "string"
+    },
+    "area": {
+      "type": "object",
+      "fields": {
+        "total": {
+          "type": "number"
+        },
+        "land": {
+          "type": "number"
+        },
+        "water": {
+          "type": "number"
+        },
+        "city": {
+          "type": "number"
+        }
+      }
+    },
+    "population": {
+      "type": "object",
+      "fields": {
+        "value": {
+          "type": "object",
+          "fields": {
+            "total": {
+              "type": "integer"
+            },
+            "city": {
+              "type": "integer"
+            }
+          }
+        },
+        "density": {
+          "type": "object",
+          "fields": {
+            "total": {
+              "type": "number"
+            },
+            "city": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "code": {
+      "type": "integer",
+      "required": true
+    },
+    "link": {
+      "type": "string"
+    },
+    "places": {
+      "virtual": true,
+      "type": "object",
+      "collection": true,
+      "function": {
+        "multi_ref": {
+          "resource_id": "places",
+          "resource_version": 1,
+          "field": "municipality",
+          "result": {
+            "type": "object",
+            "fields": {
+              "code": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "test": {
+            "contains": [
+              {
+                "self": "code"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "sort": "name",
+  "protected": {
+    "read": true
+  },
+  "id": "code",
+  "field_mapping": {
+    "population": [
+      "population.value.total"
+    ]
+  },
+  "referenceable": [
+    "code",
+    "name",
+    "state"
+  ]
+}
